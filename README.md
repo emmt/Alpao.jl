@@ -11,10 +11,17 @@ To be able to use this module, you must have installed
 and have one of their deformable mirror connected to your computer.
 
 `Alpao.jl` is not yet an [official Julia package](https://pkg.julialang.org/)
-so you have to clone the repository:
+so you have to clone the repository to install the module:
 
     Pkg.clone("https://github.com/emmt/Alpao.jl.git")
     Pkg.build("Alpao")
+
+Later, it is sufficient to do:
+
+
+    Pkg.update("Alpao")
+
+to pull the latest version.
 
 
 ## Usage
@@ -33,7 +40,7 @@ create an instance, say `dm`, of `Alpao.DeformableMirror`:
     dm = Alpao.DeformableMirror(name)
 
 where `name` identify Alpao's deformable mirror to manage.  This name must
-match taht of its configuration file (see [Configuration](#Configuration)
+match that of its configuration file (see [Configuration](#configuration)
 below).
 
 The deformable mirror instance `dm` can be used to set the shape of the
@@ -67,39 +74,40 @@ a parameter to a value, say `val`, simply do:
 The list of parameter keywords is given below (note that some parameter are
 read or write only):
 
-> -----------------------------------------------------------------------
-> Keyword         Get  Set  Value  Description
-> -----------------------------------------------------------------------
-> "AckTimeout"     x    x    > 0   For Ethernet / USB interface only, set
->                                  the time-out (ms); can be set in
->                                  synchronous mode only (see SyncMode).
-> "DacReset"            x    1     Reset all digital to analog converters
->                                  of drive electronics.
-> "ItfState"       x         0:1   Return 1 if PCI interface is busy or 0
->                                  otherwise.
-> "LogDump"             x    1     Dump the log stack on the standard
->                                  output.
-> "LogPrintLevel"  x    x    0:4   Changes the output level of the logger
->                                  to the standard output.
-> "NbOfActuator"   x         ≥ 1   Get the numbers of actuator for that
->                                  mirror.
-> "SyncMode"            x    0:1   0: Synchronous mode, will return when
->                                     send is done.
->                                  1: Asynchronous mode, return
->                                     immediately after safety checks.
-> "TriggerMode"         x    0:1   Set mode of the (optional) electronics
->                                  trigger output. 0: long pulse width or
->                                  1: short pulse width on each command.
-> "TriggerIn"           x    0:2   Set mode of the (optional) input
->                                  trigger. 0: disabled, 1: trig on rising
->                                  edge or 2: trig on falling edge.
-> "UseException"   x    x    0:1   Enables or disables the throwing of an
->                                  exception on error.
-> "VersionInfo"    x         > 0   Alpao SDK core version, e.g. 3040500612
->                                  is SDK v3.04.05.0612 where 0612 is
->                                  build number.
-> ------------------------------------------------------------------------
-
+```
+ -----------------------------------------------------------------------
+ Keyword         Get  Set  Value  Description
+ -----------------------------------------------------------------------
+ "AckTimeout"     x    x    > 0   For Ethernet / USB interface only, set
+                                  the time-out (ms); can be set in
+                                  synchronous mode only (see SyncMode).
+ "DacReset"            x    1     Reset all digital to analog converters
+                                  of drive electronics.
+ "ItfState"       x         0:1   Return 1 if PCI interface is busy or 0
+                                  otherwise.
+ "LogDump"             x    1     Dump the log stack on the standard
+                                  output.
+ "LogPrintLevel"  x    x    0:4   Changes the output level of the logger
+                                  to the standard output.
+ "NbOfActuator"   x         ≥ 1   Get the numbers of actuator for that
+                                  mirror.
+ "SyncMode"            x    0:1   0: Synchronous mode, will return when
+                                     send is done.
+                                  1: Asynchronous mode, return
+                                     immediately after safety checks.
+ "TriggerMode"         x    0:1   Set mode of the (optional) electronics
+                                  trigger output. 0: long pulse width or
+                                  1: short pulse width on each command.
+ "TriggerIn"           x    0:2   Set mode of the (optional) input
+                                  trigger. 0: disabled, 1: trig on rising
+                                  edge or 2: trig on falling edge.
+ "UseException"   x    x    0:1   Enables or disables the throwing of an
+                                  exception on error.
+ "VersionInfo"    x         > 0   Alpao SDK core version, e.g. 3040500612
+                                  is SDK v3.04.05.0612 where 0612 is
+                                  build number.
+ ------------------------------------------------------------------------
+```
 
 The last error in the SDK can be retrieved with:
 
@@ -146,20 +154,23 @@ integers, `CString` and `CStrConst` which are C-strings, `Scalar` which is C
 
 The following table summarizes the types:
 
-    -------------------------------------------------
-    Alpao API      C Type        Julia Type
-    -------------------------------------------------
-    Char           char          Cchar
-    UChar          uint8_t       UInt8
-    Short          int16_t       Int16
-    UShort         uint16_t      UInt16
-    Int            int32_t       Int32
-    UInt           uint32_t      UInt32
-    Long           int64_t       Int64
-    ULong          uint64_t      UInt64
-    Size_T         size_t        Csize_t
-    Scalar         double        Cdouble
-    asdkDM*        struct DM*    Ptr{Void}
-    CString        char*         Cstring / Ptr{UInt8}
-    CStrConst      char const*   Cstring / Ptr{UInt8}
-    -------------------------------------------------
+```
+ -------------------------------------------------
+ Alpao API      C Type        Julia Type
+ -------------------------------------------------
+ Char           char          Cchar
+ UChar          uint8_t       UInt8
+ Short          int16_t       Int16
+ UShort         uint16_t      UInt16
+ Int            int32_t       Int32
+ UInt           uint32_t      UInt32
+ Long           int64_t       Int64
+ ULong          uint64_t      UInt64
+ Size_T         size_t        Csize_t
+ Scalar         double        Cdouble
+ asdkDM*        struct DM*    Ptr{Void}
+ CString        char*         Cstring / Ptr{UInt8}
+ CStrConst      char const*   Cstring / Ptr{UInt8}
+ -------------------------------------------------
+```
+
