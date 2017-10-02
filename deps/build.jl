@@ -5,3 +5,4 @@ using Compat
 
 libalpao = library_dependency("libasdk", aliases = ["ASDK"], runtime = true)
 
+@BinDeps.install Dict(:libalpao => :DLL)
