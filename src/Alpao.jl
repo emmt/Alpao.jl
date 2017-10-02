@@ -1,0 +1,250 @@
+# Alpao.jl -
+#
+# Julia interface to Alpao's library for managing their deformable mirrors.
+#
+#------------------------------------------------------------------------------
+#
+# Copyright (C) 2016-2017, Éric Thiébaut & Jonathan Léger.
+# All rights reserved.
+#
+
+module Alpao
+
+import Base: getindex, setindex!, reset, send, length, eltype
+export stop
+
+# Notes:
+#
+# C-types are defined in "asdkType.h" and function prototypes in
+# "asdkWrapper.h" of the Alpao SDK.
+#
+# All functions but 2 return status with type `COMPL_STAT` which is an
+# enumeration (hence a `Cint`) with 2 possible values: 0 for success and -1
+# for failure.  The other functions are `asdkInit` which returns a pointer
+# to a structure (considered as anonymous, hence a `Ptr{Void}` here) and
+# `asdkPrintLastError` which returns nothing.
+#
+# The other C types used in the API are `Int` and `UInt` which are 32-bit
+# integers, `CString` and `CStrConst` which are C-strings, `Scalar` which
+# is C `double` and `Size_T` which is `size_t`.
+#
+# The following table summarizes the types:
+#
+# -------------------------------------------------
+# Alpao API      C Type        Julia Type
+# -------------------------------------------------
+# Char           char          Cchar
+# UChar          uint8_t       UInt8
+# Short          int16_t       Int16
+# UShort         uint16_t      UInt16
+# Int            int32_t       Int32
+# UInt           uint32_t      UInt32
+# Long           int64_t       Int64
+# ULong          uint64_t      UInt64
+# Size_T         size_t        Csize_t
+# Scalar         double        Cdouble
+# asdkDM*        struct DM*    Ptr{Void}
+# CString        char*         Cstring / Ptr{UInt8}
+# CStrConst      char const*   Cstring / Ptr{UInt8}
+# -------------------------------------------------
+#
+
+const Keyword = String
+const Scalar  = Cdouble
+const Status  = Cint
+
+const SUCCESS = Status(0)
+const FAILURE = Status(-1)
+
+const depsfile = joinpath(dirname(@__FILE__),"..","deps","deps.jl")
+if isfile(depsfile)
+    include(depsfile)
+else
+    error("Alpao not properly installed.  Please run Pkg.build(\"Alpao\")")
+end
+
+"""
+    dm = Alpao.DeformableMirror(name)
+
+creates an instance `dm` to manage Alpao's deformable mirror identifed by the
+name of its configuration file.
+
+The deformable mirror instance `dm` can be used as follows:
+
+    length(dm)         -> number of actuators
+    eltype(dm)         -> bit type for an actuator command
+    dm[key]            -> get value of keyword `key`
+    dm[key] = val      -> set value of keyword `key`
+    send(dm, cmd)      -> set the shape of the deformable mirror
+    send(dm, pat, rep) -> repeatedly send patterns to the deformable mirror
+    reset(dm)          -> reset the deformable mirror values
+    stop(dm)           -> stop asynchronous commands sent to the deformable
+                          mirror
+
+
+List of parameter keywords
+
+    ---------------------------------------------------------------------------
+    Keyword         Get  Set  Value  Description
+    ---------------------------------------------------------------------------
+    "AckTimeout"     x    x    > 0   For Ethernet / USB interface only, set the
+                                     time-out (ms); can be set in synchronous
+                                     mode only (see SyncMode).
+    "DacReset"            x    1     Reset all digital to analog converters of
+                                     drive electronics.
+    "ItfState"       x         0:1   Return 1 if PCI interface is busy or 0
+                                     otherwise.
+    "LogDump"             x    1     Dump the log stack on the standard output.
+    "LogPrintLevel"  x    x    0:4   Changes the output level of the logger to
+                                     the standard output.
+    "NbOfActuator"   x         ≥ 1   Get the numbers of actuator for that
+                                     mirror.
+    "SyncMode"            x    0:1   0: Synchronous mode, will return when send
+                                        is done.
+                                     1: Asynchronous mode, return immediately
+                                        after safety checks.
+    "TriggerMode"         x    0:1   Set mode of the (optional) electronics
+                                     trigger output. 0: long pulse width or 1:
+                                     short pulse width on each command.
+    "TriggerIn"           x    0:2   Set mode of the (optional) input trigger.
+                                     0: disabled, 1: trig on rising edge or
+                                     2: trig on falling edge.
+    "UseException"   x    x    0:1   Enables or disables the throwing of an
+                                     exception on error.
+    "VersionInfo"    x         > 0   Alpao SDK core version, e.g. 3040500612 is
+                                     SDK v3.04.05.0612 where 0612 is build
+                                     number.
+    ---------------------------------------------------------------------------
+"""
+type DeformableMirror
+    ptr::Ptr{Void}  # handle to device
+    num::Int        # number of actuators
+    function DeformableMirror(ident::String)
+        local ptr::Ptr{Void}, num::Int
+        ptr = ccall((:asdkInit, DLL), Ptr{Void}, (Cstring,), ident)
+        if ptr == C_NULL
+            code, mesg = lasterror()
+            error("failed to open $ident ($mesg)")
+        end
+        num = convert(Int, _get(ptr, "NbOfActuator")) :: Int
+        obj = new(ptr, num)
+        finalizer(obj, obj->ccall((:asdkRelease, DLL), Status,
+                                  (Ptr{Void},), obj.ptr))
+        return obj
+    end
+end
+
+length(obj::DeformableMirror) = obj.num
+eltype(::DeformableMirror) = Scalar
+
+const CMDMAX = Scalar(1.0)
+
+"""
+    send(dm, arr)
+
+Send actuator commands `arr` to deformable mirror(s) `dm`.
+"""
+function send(obj::DeformableMirror, arr::DenseVector{Scalar})
+    @assert length(arr) == length(obj) # FIXME: there may be several mirrors
+    _check(ccall((:asdkSend, DLL), Status, (Ptr{Void}, Ptr{Scalar}),
+                 obj.ptr, clamp(arr, -CMDMAX, CMDMAX)))
+end
+
+# Send patterns as quickly as possible.
+function send(obj::DeformableMirror, pat::DenseMatrix{Scalar}, rep::Integer)
+    @assert size(pat, 1) == length(obj) # FIXME: there may be several mirrors
+    _check(ccall((:asdkSendPattern, DLL), Status,
+                 (Ptr{Void}, Ptr{Scalar}, UInt32, UInt32),
+                 obj.ptr, clamp(pat, -CMDMAX, CMDMAX), size(pat, 2), rep))
+end
+
+"""
+    Alpao.lasterror() -> (code, mesg)
+
+pops the last error from the stack and returns error code and corresponding
+message.
+
+"""
+function lasterror()
+    code = Ref{UInt32}(0)
+    mesg = zeros(UInt8, 512) # message buffer filled with zeroes
+    if ccall((:asdkGetLastError, DLL), Status,
+             (Ptr{UInt32}, Ptr{UInt8}, Csize_t),
+             code, mesg, sizeof(mesg)) != SUCCESS
+        error("failed to retrieve last error message")
+    end
+    mesg[end] = 0
+    (code[], String(mesg))
+end
+
+printlasterror() = ccall((:asdkPrintLastError, DLL), Void, ())
+
+function _check(status::Status)
+    if status != SUCCESS
+        code, mesg = lasterror()
+        error(mesg)
+    end
+end
+
+stop(dm::DeformableMirror) =
+    _check(ccall((:asdkStop, DLL), Status, (Ptr{Void},), dm.ptr))
+
+reset(dm::DeformableMirror) =
+    _check(ccall((:asdkReset, DLL), Status, (Ptr{Void},), dm.ptr))
+
+getindex(dm::DeformableMirror, key::Keyword) = _get(dm.ptr, key)
+
+function _get(ptr::Ptr{Void}, key::Keyword)
+    @assert ptr != C_NULL
+    val = Ref{Scalar}(0)
+    _check(ccall((:asdkGet, DLL), Status, (Ptr{Void}, Cstring, Ptr{Scalar}),
+                 ptr, key, val))
+    return val[]
+end
+
+setindex!(dm::DeformableMirror, val, key::Keyword) = _set!(dm, key, val)
+
+_set!(dm::DeformableMirror, key::Keyword, val::Real) =
+    _set!(dm, key, Scalar(val))
+
+_set!(dm::DeformableMirror, key::Keyword, val::Scalar) =
+    _check(ccall((:asdkSet, DLL), Status,
+                 (Ptr{Void}, Cstring, Scalar),
+                 dm.ptr, key, val))
+
+_set!(dm::DeformableMirror, key::Keyword, val::String) =
+    _check(ccall((:asdkSetString, DLL), Status,
+                 (Ptr{Void}, Cstring, Cstring),
+                 dm.ptr, key, val))
+
+"""
+`runtests(name)` run simple tests for deformable mirror identified by `name`.
+"""
+function runtests(name::String="BOL143")
+    dm = DeformableMirror(name)
+    val = length(dm)
+    println("NB actuators ", round(Int, dm["NbOfActuator"]))
+    println("NB actuators ", val)
+    image_count = 0
+    tot_image_count = 0
+    data = Array(Cdouble, val)
+    data[:] = 0.0
+    time = 0.0
+    while tot_image_count < 10000
+        for i in 1:val
+            data[i] = 0.12;
+            dm.send( data );
+            data[i] = 0.0;
+            if time() - time >= 1.0
+                print(image_count," FPS\r")
+                image_count = 0
+                time = time()
+            end
+            image_count += 1
+            tot_image_count += 1
+        end
+    end
+    println()
+end
+
+end # module Alpao
