@@ -4,8 +4,10 @@
 #
 #------------------------------------------------------------------------------
 #
+# This file is part of the `Alpao.jl` package which is licensed under the MIT
+# "Expat" License.
+#
 # Copyright (C) 2016-2017, Éric Thiébaut & Jonathan Léger.
-# All rights reserved.
 #
 
 module Alpao
