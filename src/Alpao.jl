@@ -14,6 +14,10 @@ module Alpao
 
 import Base: getindex, setindex!, reset, send, length, eltype
 
+if isdefined(Base, :stop)
+    import Base: stop
+end
+
 export
     send!,
     stop
