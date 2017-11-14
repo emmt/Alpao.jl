@@ -185,7 +185,7 @@ See also: [`send`](@ref)
 """
 function send!(dm::DeformableMirror, cmd::DenseVector{Scalar})
     @assert length(cmd) == length(dm) # FIXME: there may be several mirrors
-    for i in eachindex(cmd)
+    @inbounds for i in eachindex(cmd)
         cmd[i] = clamp(cmd[i], -CMDMAX, CMDMAX)
     end
     _check(ccall((:asdkSend, DLL), Status, (Ptr{Void}, Ptr{Scalar}),
@@ -195,7 +195,7 @@ end
 # Send patterns as quickly as possible.
 function send!(dm::DeformableMirror, pat::DenseMatrix{Scalar}, rep::Integer)
     @assert size(pat, 1) == length(dm) # FIXME: there may be several mirrors
-    for i in eachindex(pat)
+    @inbounds for i in eachindex(pat)
         pat[i] = clamp(pat[i], -CMDMAX, CMDMAX)
     end
     _check(ccall((:asdkSendPattern, DLL), Status,
