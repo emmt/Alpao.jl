@@ -54,6 +54,9 @@ It is also possible to repeatedly send patterns to the deformable mirror with:
 
     send(dm, pat, rep)
 
+There is a variant `send!` which uses no temporary array and, on return, leaves
+the acutal command values in `cmd` (or `pat`).
+
 To reset the deformable mirror values, call:
 
     reset(dm)

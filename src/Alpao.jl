@@ -13,7 +13,10 @@
 module Alpao
 
 import Base: getindex, setindex!, reset, send, length, eltype
-export stop
+
+export
+    send!,
+    stop
 
 # Notes:
 #
@@ -73,15 +76,17 @@ name of its configuration file.
 
 The deformable mirror instance `dm` can be used as follows:
 
-    length(dm)         -> number of actuators
-    eltype(dm)         -> bit type for an actuator command
-    dm[key]            -> get value of keyword `key`
-    dm[key] = val      -> set value of keyword `key`
-    send(dm, cmd)      -> set the shape of the deformable mirror
-    send(dm, pat, rep) -> repeatedly send patterns to the deformable mirror
-    reset(dm)          -> reset the deformable mirror values
-    stop(dm)           -> stop asynchronous commands sent to the deformable
-                          mirror
+    length(dm)          # yields number of actuators
+    eltype(dm)          # yields bit type for an actuator command
+    dm[key]             # yields value of keyword `key`
+    dm[key] = val       # sets value of keyword `key`
+    send(dm, cmd)       # sets the shape of the deformable mirror
+    send!(dm, cmd)      # idem but, on return, `cmd` contains actual commands
+    send(dm, pat, rep)  # repeatedly send patterns to the deformable mirror
+    send!(dm, pat, rep) # idem but, on return, `pat` contains actual commands
+    reset(dm)           # resets the deformable mirror values
+    stop(dm)            # stops asynchronous commands sent to the deformable
+                        # mirror
 
 
 List of parameter keywords
@@ -121,7 +126,7 @@ List of parameter keywords
 type DeformableMirror
     ptr::Ptr{Void}  # handle to device
     num::Int        # number of actuators
-    function DeformableMirror(ident::String)
+    function DeformableMirror(ident::AbstractString)
         local ptr::Ptr{Void}, num::Int
         ptr = ccall((:asdkInit, DLL), Ptr{Void}, (Cstring,), ident)
         if ptr == C_NULL
@@ -129,35 +134,69 @@ type DeformableMirror
             error("failed to open $ident ($mesg)")
         end
         num = convert(Int, _get(ptr, "NbOfActuator")) :: Int
-        obj = new(ptr, num)
-        finalizer(obj, obj->ccall((:asdkRelease, DLL), Status,
-                                  (Ptr{Void},), obj.ptr))
-        return obj
+        dm = new(ptr, num)
+        finalizer(dm, dm->ccall((:asdkRelease, DLL), Status,
+                                (Ptr{Void},), dm.ptr))
+        return dm
     end
 end
 
-length(obj::DeformableMirror) = obj.num
+length(dm::DeformableMirror) = dm.num
 eltype(::DeformableMirror) = Scalar
 
 const CMDMAX = Scalar(1.0)
 
 """
-    send(dm, arr)
+    send(dm, cmd)
 
-Send actuator commands `arr` to deformable mirror(s) `dm`.
+sends actuator commands `cmd` to deformable mirror(s) `dm`.
+
+    send(dm, pat, rep)
+
+sends commands in `pat` to deformable mirror(s) `dm` as quickly as possible.
+
+
+See also: [`send!`](@ref)
 """
-function send(obj::DeformableMirror, arr::DenseVector{Scalar})
-    @assert length(arr) == length(obj) # FIXME: there may be several mirrors
+send(dm::DeformableMirror, cmd::DenseVector{Scalar}) =
+    send!(dm, copy(cmd))
+
+send(dm::DeformableMirror, pat::DenseMatrix{Scalar}, rep::Integer) =
+    send(dm, copy(pat), rep)
+
+"""
+    send!(dm, cmd)
+
+sends actuator commands `cmd` to deformable mirror(s) `dm`.  The command
+values in `cmd` may be modified due to bound constraints.  Thus, on return,
+`cmd` contains the actual commands sent to the mirror.
+
+    send!(dm, pat, rep)
+
+sends commands in `pat` to deformable mirror(s) `dm` as quickly as possible
+and leaves actual command values in `pat`.
+
+
+See also: [`send`](@ref)
+"""
+function send!(dm::DeformableMirror, cmd::DenseVector{Scalar})
+    @assert length(cmd) == length(dm) # FIXME: there may be several mirrors
+    for i in eachindex(cmd)
+        cmd[i] = clamp(cmd[i], -CMDMAX, CMDMAX)
+    end
     _check(ccall((:asdkSend, DLL), Status, (Ptr{Void}, Ptr{Scalar}),
-                 obj.ptr, clamp(arr, -CMDMAX, CMDMAX)))
+                 dm.ptr, cmd))
 end
 
 # Send patterns as quickly as possible.
-function send(obj::DeformableMirror, pat::DenseMatrix{Scalar}, rep::Integer)
-    @assert size(pat, 1) == length(obj) # FIXME: there may be several mirrors
+function send!(dm::DeformableMirror, pat::DenseMatrix{Scalar}, rep::Integer)
+    @assert size(pat, 1) == length(dm) # FIXME: there may be several mirrors
+    for i in eachindex(pat)
+        pat[i] = clamp(pat[i], -CMDMAX, CMDMAX)
+    end
     _check(ccall((:asdkSendPattern, DLL), Status,
                  (Ptr{Void}, Ptr{Scalar}, UInt32, UInt32),
-                 obj.ptr, clamp(pat, -CMDMAX, CMDMAX), size(pat, 2), rep))
+                 dm.ptr, pat, size(pat, 2), rep))
 end
 
 """
@@ -220,7 +259,9 @@ _set!(dm::DeformableMirror, key::Keyword, val::String) =
                  dm.ptr, key, val))
 
 """
+
 `runtests(name)` run simple tests for deformable mirror identified by `name`.
+
 """
 function runtests(name::String="BOL143")
     dm = DeformableMirror(name)
