@@ -132,7 +132,18 @@ type DeformableMirror
     num::Int        # number of actuators
     function DeformableMirror(ident::AbstractString)
         local ptr::Ptr{Void}, num::Int
-        ptr = ccall((:asdkInit, DLL), Ptr{Void}, (Cstring,), ident)
+        if contains(ident, "/")
+            odir = pwd()
+            try
+                cd(dirname(ident))
+                ptr = ccall((:asdkInit, DLL), Ptr{Void}, (Cstring,),
+                            basename(ident))
+            finally
+                cd(odir)
+            end
+        else
+            ptr = ccall((:asdkInit, DLL), Ptr{Void}, (Cstring,), ident)
+        end
         if ptr == C_NULL
             code, mesg = lasterror()
             error("failed to open $ident ($mesg)")
