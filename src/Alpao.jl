@@ -10,6 +10,8 @@
 # Copyright (C) 2016-2017, Éric Thiébaut & Jonathan Léger.
 #
 
+isdefined(Base, :__precompile__) && __precompile__(true)
+
 module Alpao
 
 import Base: getindex, setindex!, reset, send, length, eltype
