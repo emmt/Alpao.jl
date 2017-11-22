@@ -132,7 +132,7 @@ type DeformableMirror
     num::Int        # number of actuators
     function DeformableMirror(ident::AbstractString)
         local ptr::Ptr{Void}, num::Int
-        if contains(ident, "/")
+        if '/' in ident
             odir = pwd()
             try
                 cd(dirname(ident))
