@@ -179,7 +179,7 @@ send(dm::DeformableMirror, cmd::DenseVector{Scalar}) =
     send!(dm, copy(cmd))
 
 send(dm::DeformableMirror, pat::DenseMatrix{Scalar}, rep::Integer) =
-    send(dm, copy(pat), rep)
+    send!(dm, copy(pat), rep)
 
 """
     send!(dm, cmd)
@@ -190,8 +190,9 @@ values in `cmd` may be modified due to bound constraints.  Thus, on return,
 
     send!(dm, pat, rep)
 
-sends commands in `pat` to deformable mirror(s) `dm` as quickly as possible
-and leaves actual command values in `pat`.
+sends commands in `pat` to deformable mirror(s) `dm` as quickly as possible and
+leaves actual command values in `pat`. `rep` is the number of time to repeat
+that pattern (some interface not allow you to use this feature).
 
 
 See also: [`send`](@ref)
