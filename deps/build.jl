@@ -1,5 +1,5 @@
-let dlext = (VERSION >= v"0.4.0-dev+3844" ? Base.Libdl : Base).dlext,
-    dlopen_e = (VERSION >= v"0.4.0-dev+3844" ? Base.Libdl : Base).dlopen_e,
+let dlext = (Base.Libdl).dlext,
+    dlopen_e = (Base.Libdl).dlopen_e,
     path = "libasdk."*dlext
 
     if dlopen_e(path) == C_NULL
