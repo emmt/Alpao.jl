@@ -7,16 +7,17 @@
 # This file is part of the `Alpao.jl` package which is licensed under the MIT
 # "Expat" License.
 #
-# Copyright (C) 2016-2017, Éric Thiébaut & Jonathan Léger.
+# Copyright (C) 2016-2019, Éric Thiébaut & Jonathan Léger.
 #
 
 isdefined(Base, :__precompile__) && __precompile__(true)
 
 module Alpao
 
-import Base: getindex, setindex!, reset, send, length, eltype
+import Base: getindex, setindex!, reset, length, eltype
+import Sockets.send
 
-if isdefined(Base, :stop)
+@static if isdefined(Base, :stop)
     import Base: stop
 end
 
@@ -32,7 +33,7 @@ export
 # All functions but 2 return status with type `COMPL_STAT` which is an
 # enumeration (hence a `Cint`) with 2 possible values: 0 for success and -1
 # for failure.  The other functions are `asdkInit` which returns a pointer
-# to a structure (considered as anonymous, hence a `Ptr{Void}` here) and
+# to a structure (considered as anonymous, hence a `Ptr{Cvoid}` here) and
 # `asdkPrintLastError` which returns nothing.
 #
 # The other C types used in the API are `Int` and `UInt` which are 32-bit
@@ -54,7 +55,7 @@ export
 # ULong          uint64_t      UInt64
 # Size_T         size_t        Csize_t
 # Scalar         double        Cdouble
-# asdkDM*        struct DM*    Ptr{Void}
+# asdkDM*        struct DM*    Ptr{Cvoid}
 # CString        char*         Cstring / Ptr{UInt8}
 # CStrConst      char const*   Cstring / Ptr{UInt8}
 # -------------------------------------------------
@@ -129,32 +130,36 @@ List of parameter keywords
                                      number.
     ---------------------------------------------------------------------------
 """
-type DeformableMirror
-    ptr::Ptr{Void}  # handle to device
+mutable struct DeformableMirror
+    ptr::Ptr{Cvoid} # handle to device
     num::Int        # number of actuators
     function DeformableMirror(ident::AbstractString)
-        local ptr::Ptr{Void}, num::Int
+        local ptr::Ptr{Cvoid}, num::Int
         if '/' in ident
             odir = pwd()
             try
                 cd(dirname(ident))
-                ptr = ccall((:asdkInit, DLL), Ptr{Void}, (Cstring,),
+                ptr = ccall((:asdkInit, DLL), Ptr{Cvoid}, (Cstring,),
                             basename(ident))
             finally
                 cd(odir)
             end
         else
-            ptr = ccall((:asdkInit, DLL), Ptr{Void}, (Cstring,), ident)
+            ptr = ccall((:asdkInit, DLL), Ptr{Cvoid}, (Cstring,), ident)
         end
         if ptr == C_NULL
             code, mesg = lasterror()
             error("failed to open $ident ($mesg)")
         end
         num = convert(Int, _get(ptr, "NbOfActuator")) :: Int
-        dm = new(ptr, num)
-        finalizer(dm, dm->ccall((:asdkRelease, DLL), Status,
-                                (Ptr{Void},), dm.ptr))
-        return dm
+        return finalizer(_release, new(ptr, num))
+    end
+end
+
+function _release(dm::DeformableMirror)
+    if dm.ptr != C_NULL
+        status = ccall((:asdkRelease, DLL), Status, (Ptr{Cvoid},), dm.ptr)
+        dm.ptr = C_NULL
     end
 end
 
@@ -202,7 +207,7 @@ function send!(dm::DeformableMirror, cmd::DenseVector{Scalar})
     @inbounds for i in eachindex(cmd)
         cmd[i] = clamp(cmd[i], -CMDMAX, CMDMAX)
     end
-    _check(ccall((:asdkSend, DLL), Status, (Ptr{Void}, Ptr{Scalar}),
+    _check(ccall((:asdkSend, DLL), Status, (Ptr{Cvoid}, Ptr{Scalar}),
                  dm.ptr, cmd))
 end
 
@@ -213,7 +218,7 @@ function send!(dm::DeformableMirror, pat::DenseMatrix{Scalar}, rep::Integer)
         pat[i] = clamp(pat[i], -CMDMAX, CMDMAX)
     end
     _check(ccall((:asdkSendPattern, DLL), Status,
-                 (Ptr{Void}, Ptr{Scalar}, UInt32, UInt32),
+                 (Ptr{Cvoid}, Ptr{Scalar}, UInt32, UInt32),
                  dm.ptr, pat, size(pat, 2), rep))
 end
 
@@ -236,7 +241,7 @@ function lasterror()
     (code[], String(mesg))
 end
 
-printlasterror() = ccall((:asdkPrintLastError, DLL), Void, ())
+printlasterror() = ccall((:asdkPrintLastError, DLL), Cvoid, ())
 
 function _check(status::Status)
     if status != SUCCESS
@@ -246,17 +251,17 @@ function _check(status::Status)
 end
 
 stop(dm::DeformableMirror) =
-    _check(ccall((:asdkStop, DLL), Status, (Ptr{Void},), dm.ptr))
+    _check(ccall((:asdkStop, DLL), Status, (Ptr{Cvoid},), dm.ptr))
 
 reset(dm::DeformableMirror) =
-    _check(ccall((:asdkReset, DLL), Status, (Ptr{Void},), dm.ptr))
+    _check(ccall((:asdkReset, DLL), Status, (Ptr{Cvoid},), dm.ptr))
 
 getindex(dm::DeformableMirror, key::Keyword) = _get(dm.ptr, key)
 
-function _get(ptr::Ptr{Void}, key::Keyword)
+function _get(ptr::Ptr{Cvoid}, key::Keyword)
     @assert ptr != C_NULL
     val = Ref{Scalar}(0)
-    _check(ccall((:asdkGet, DLL), Status, (Ptr{Void}, Cstring, Ptr{Scalar}),
+    _check(ccall((:asdkGet, DLL), Status, (Ptr{Cvoid}, Cstring, Ptr{Scalar}),
                  ptr, key, val))
     return val[]
 end
@@ -268,12 +273,12 @@ _set!(dm::DeformableMirror, key::Keyword, val::Real) =
 
 _set!(dm::DeformableMirror, key::Keyword, val::Scalar) =
     _check(ccall((:asdkSet, DLL), Status,
-                 (Ptr{Void}, Cstring, Scalar),
+                 (Ptr{Cvoid}, Cstring, Scalar),
                  dm.ptr, key, val))
 
 _set!(dm::DeformableMirror, key::Keyword, val::String) =
     _check(ccall((:asdkSetString, DLL), Status,
-                 (Ptr{Void}, Cstring, Cstring),
+                 (Ptr{Cvoid}, Cstring, Cstring),
                  dm.ptr, key, val))
 
 """
