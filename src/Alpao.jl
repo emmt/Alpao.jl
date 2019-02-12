@@ -10,20 +10,21 @@
 # Copyright (C) 2016-2019, Éric Thiébaut & Jonathan Léger.
 #
 
-isdefined(Base, :__precompile__) && __precompile__(true)
+__precompile__(true)
 
 module Alpao
 
+export
+    send!,
+    send,
+    stop
+
 import Base: getindex, setindex!, reset, length, eltype
-import Sockets.send
+import Sockets: send
 
 @static if isdefined(Base, :stop)
     import Base: stop
 end
-
-export
-    send!,
-    stop
 
 # Notes:
 #
