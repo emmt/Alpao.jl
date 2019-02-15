@@ -10,8 +10,6 @@
 # Copyright (C) 2016-2019, Éric Thiébaut & Jonathan Léger.
 #
 
-__precompile__(true)
-
 module Alpao
 
 export
@@ -69,7 +67,7 @@ const Status  = Cint
 const SUCCESS = Status(0)
 const FAILURE = Status(-1)
 
-const depsfile = joinpath(dirname(@__FILE__),"..","deps","deps.jl")
+const depsfile = joinpath(@__DIR__,"..","deps","deps.jl")
 if isfile(depsfile)
     include(depsfile)
 else
