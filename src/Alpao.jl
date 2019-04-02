@@ -13,7 +13,6 @@
 module Alpao
 
 export
-    lastcommands,
     send!,
     send,
     stop
@@ -88,6 +87,9 @@ The deformable mirror instance `dm` can be used as follows:
     eltype(dm)          # yields bit type for an actuator command
     dm[key]             # yields value of keyword `key`
     dm[key] = val       # sets value of keyword `key`
+    dm[]                # yields the last commands sent to the mirror
+    dm[:]               # yields a copy of the last commands
+    dm[i]               # yields the value of i-th actuator in the last commands
     send(dm, cmd)       # sets the shape of the deformable mirror
     send!(dm, cmd)      # idem but, on return, `cmd` contains actual commands
     reset(dm)           # resets the deformable mirror values
@@ -166,19 +168,6 @@ end
 
 Base.length(dm::DeformableMirror) = dm.num
 Base.eltype(::DeformableMirror) = Scalar
-
-"""
-
-```julia
-lastcommands(dm) -> cmd
-```
-
-yields the last actuator commands sent to deformable mirror `dm`.
-
-See also: [`send`](@ref), [`send!`](@ref).
-
-"""
-lastcommands(dm::DeformableMirror) = dm.cmd
 
 """
 
@@ -273,6 +262,8 @@ function reset(dm::DeformableMirror)
     _check(ccall((:asdkReset, DLL), Status, (Ptr{Cvoid},), dm.ptr))
 end
 
+Base.getindex(dm::DeformableMirror) = dm.cmd
+Base.getindex(dm::DeformableMirror, ::Colon) = dm.cmd[:]
 Base.getindex(dm::DeformableMirror, i::Integer) = dm.cmd[i]
 Base.getindex(dm::DeformableMirror, i::AbstractUnitRange{<:Integer}) = dm.cmd[i]
 Base.getindex(dm::DeformableMirror, key::Keyword) = _get(dm.ptr, key)
