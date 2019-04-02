@@ -13,11 +13,12 @@
 module Alpao
 
 export
+    lastcommands,
     send!,
     send,
     stop
 
-import Base: getindex, setindex!, reset, length, eltype
+import Base: reset
 import Sockets: send
 
 @static if isdefined(Base, :stop)
@@ -66,16 +67,17 @@ const Status  = Cint
 
 const SUCCESS = Status(0)
 const FAILURE = Status(-1)
+const CMDMAX = Scalar(1.0)
 
-const depsfile = joinpath(@__DIR__,"..","deps","deps.jl")
-if isfile(depsfile)
-    include(depsfile)
-else
+isfile(joinpath(@__DIR__,"..","deps","deps.jl")) ||
     error("Alpao not properly installed.  Please run Pkg.build(\"Alpao\")")
-end
+include("../deps/deps.jl")
 
 """
-    dm = Alpao.DeformableMirror(name)
+
+```julia
+dm = Alpao.DeformableMirror(name)
+```
 
 creates an instance `dm` to manage Alpao's deformable mirror identifed by the
 name of its configuration file.
@@ -88,8 +90,6 @@ The deformable mirror instance `dm` can be used as follows:
     dm[key] = val       # sets value of keyword `key`
     send(dm, cmd)       # sets the shape of the deformable mirror
     send!(dm, cmd)      # idem but, on return, `cmd` contains actual commands
-    send(dm, pat, rep)  # repeatedly send patterns to the deformable mirror
-    send!(dm, pat, rep) # idem but, on return, `pat` contains actual commands
     reset(dm)           # resets the deformable mirror values
     stop(dm)            # stops asynchronous commands sent to the deformable
                         # mirror
@@ -130,8 +130,9 @@ List of parameter keywords
     ---------------------------------------------------------------------------
 """
 mutable struct DeformableMirror
-    ptr::Ptr{Cvoid} # handle to device
-    num::Int        # number of actuators
+    ptr::Ptr{Cvoid}     # handle to device
+    num::Int            # number of actuators
+    cmd::Vector{Scalar} # last command
     function DeformableMirror(ident::AbstractString)
         local ptr::Ptr{Cvoid}, num::Int
         if '/' in ident
@@ -151,7 +152,8 @@ mutable struct DeformableMirror
             error("failed to open $ident ($mesg)")
         end
         num = convert(Int, _get(ptr, "NbOfActuator")) :: Int
-        return finalizer(_release, new(ptr, num))
+        cmd = zeros(Scalar, num)
+        return finalizer(_release, new(ptr, num, cmd))
     end
 end
 
@@ -162,67 +164,81 @@ function _release(dm::DeformableMirror)
     end
 end
 
-length(dm::DeformableMirror) = dm.num
-eltype(::DeformableMirror) = Scalar
-
-const CMDMAX = Scalar(1.0)
+Base.length(dm::DeformableMirror) = dm.num
+Base.eltype(::DeformableMirror) = Scalar
 
 """
-    send(dm, cmd)
 
-sends actuator commands `cmd` to deformable mirror(s) `dm`.
+```julia
+lastcommands(dm) -> cmd
+```
 
-    send(dm, pat, rep)
+yields the last actuator commands sent to deformable mirror `dm`.
 
-sends commands in `pat` to deformable mirror(s) `dm` as quickly as possible.
-
-
-See also: [`send!`](@ref)
-"""
-send(dm::DeformableMirror, cmd::DenseVector{Scalar}) =
-    send!(dm, copy(cmd))
-
-send(dm::DeformableMirror, pat::DenseMatrix{Scalar}, rep::Integer) =
-    send!(dm, copy(pat), rep)
+See also: [`send`](@ref), [`send!`](@ref).
 
 """
-    send!(dm, cmd)
+lastcommands(dm::DeformableMirror) = dm.cmd
 
-sends actuator commands `cmd` to deformable mirror(s) `dm`.  The command
-values in `cmd` may be modified due to bound constraints.  Thus, on return,
-`cmd` contains the actual commands sent to the mirror.
-
-    send!(dm, pat, rep)
-
-sends commands in `pat` to deformable mirror(s) `dm` as quickly as possible and
-leaves actual command values in `pat`. `rep` is the number of time to repeat
-that pattern (some interface not allow you to use this feature).
-
-
-See also: [`send`](@ref)
 """
-function send!(dm::DeformableMirror, cmd::DenseVector{Scalar})
-    @assert length(cmd) == length(dm) # FIXME: there may be several mirrors
-    @inbounds for i in eachindex(cmd)
-        cmd[i] = clamp(cmd[i], -CMDMAX, CMDMAX)
+
+```julia
+send(dm, cmd) -> actcmd
+```
+
+sends actuator commands `cmd` to deformable mirror `dm` and return vector of
+actual commands sent to the mirror.
+
+See also: [`send!`](@ref), [`lastcommand`](@ref).
+
+"""
+function send(dm::DeformableMirror, cmd::AbstractVector{<:AbstractFloat})
+    num = length(dm) # FIXME: there may be several mirrors
+    @assert length(cmd) == num
+    length(dm.cmd) == num || resize!(dm.cmd, num)
+    @inbounds for i in 1:num
+        dm.cmd[i] = clamp(Scalar(cmd[i]), -CMDMAX, CMDMAX)
     end
+    _send(dm)
+    return dm.cmd
+end
+
+"""
+
+```julia
+send!(dm, cmd) -> cmd
+```
+
+sends actuator commands `cmd` to deformable mirror `dm` and return, possibly
+modified, commands.  The command values in `cmd` may be modified due to bound
+constraints.  Thus, on return, `cmd` contains the actual commands sent to the
+mirror.
+
+See also: [`send`](@ref), [`lastcommand`](@ref).
+
+"""
+function send!(dm::DeformableMirror, cmd::AbstractVector{<:AbstractFloat})
+    num = length(dm) # FIXME: there may be several mirrors
+    @assert length(cmd) == num
+    length(dm.cmd) == num || resize!(dm.cmd, num)
+    @inbounds for i in 1:num
+        val = clamp(Scalar(cmd[i]), -CMDMAX, CMDMAX)
+        dm.cmd[i] = val
+        cmd[i] = val
+    end
+    _send(dm)
+    return cmd
+end
+
+_send(dm::DeformableMirror) =
     _check(ccall((:asdkSend, DLL), Status, (Ptr{Cvoid}, Ptr{Scalar}),
-                 dm.ptr, cmd))
-end
-
-# Send patterns as quickly as possible.
-function send!(dm::DeformableMirror, pat::DenseMatrix{Scalar}, rep::Integer)
-    @assert size(pat, 1) == length(dm) # FIXME: there may be several mirrors
-    @inbounds for i in eachindex(pat)
-        pat[i] = clamp(pat[i], -CMDMAX, CMDMAX)
-    end
-    _check(ccall((:asdkSendPattern, DLL), Status,
-                 (Ptr{Cvoid}, Ptr{Scalar}, UInt32, UInt32),
-                 dm.ptr, pat, size(pat, 2), rep))
-end
+                 dm.ptr, dm.cmd))
 
 """
-    Alpao.lasterror() -> (code, mesg)
+
+```julia
+Alpao.lasterror() -> (code, mesg)
+```
 
 pops the last error from the stack and returns error code and corresponding
 message.
@@ -252,10 +268,14 @@ end
 stop(dm::DeformableMirror) =
     _check(ccall((:asdkStop, DLL), Status, (Ptr{Cvoid},), dm.ptr))
 
-reset(dm::DeformableMirror) =
+function reset(dm::DeformableMirror)
+    fill!(dm.cmd, Scalar(0))
     _check(ccall((:asdkReset, DLL), Status, (Ptr{Cvoid},), dm.ptr))
+end
 
-getindex(dm::DeformableMirror, key::Keyword) = _get(dm.ptr, key)
+Base.getindex(dm::DeformableMirror, i::Integer) = dm.cmd[i]
+Base.getindex(dm::DeformableMirror, i::AbstractUnitRange{<:Integer}) = dm.cmd[i]
+Base.getindex(dm::DeformableMirror, key::Keyword) = _get(dm.ptr, key)
 
 function _get(ptr::Ptr{Cvoid}, key::Keyword)
     @assert ptr != C_NULL
@@ -265,7 +285,7 @@ function _get(ptr::Ptr{Cvoid}, key::Keyword)
     return val[]
 end
 
-setindex!(dm::DeformableMirror, val, key::Keyword) = _set!(dm, key, val)
+Base.setindex!(dm::DeformableMirror, val, key::Keyword) = _set!(dm, key, val)
 
 _set!(dm::DeformableMirror, key::Keyword, val::Real) =
     _set!(dm, key, Scalar(val))
