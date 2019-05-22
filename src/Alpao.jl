@@ -67,6 +67,7 @@ const Status  = Cint
 const SUCCESS = Status(0)
 const FAILURE = Status(-1)
 const CMDMAX = Scalar(1.0)
+const CMDMIN = -CMDMAX
 
 isfile(joinpath(@__DIR__,"..","deps","deps.jl")) ||
     error("Alpao not properly installed.  Please run Pkg.build(\"Alpao\")")
@@ -186,11 +187,24 @@ function send(dm::DeformableMirror, cmd::AbstractVector{<:AbstractFloat})
     @assert length(cmd) == num
     length(dm.cmd) == num || resize!(dm.cmd, num)
     @inbounds for i in 1:num
-        dm.cmd[i] = clamp(Scalar(cmd[i]), -CMDMAX, CMDMAX)
+        dm.cmd[i] = clamp(Scalar(cmd[i]), CMDMIN, CMDMAX)
     end
     _send(dm)
     return dm.cmd
 end
+
+"""
+
+```julia
+lastcommand(dm) -> cmd
+```
+
+yields the last command actually sent to the deformable mirror `dm`.
+
+See also: [`send(::DeformableMirror)`](@ref).
+
+"""
+lastcommand(dm::DeformableMirror) = dm.cmd
 
 """
 
