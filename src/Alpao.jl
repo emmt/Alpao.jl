@@ -196,7 +196,8 @@ See also: [`send!`](@ref), [`lastcommand`](@ref).
 """
 function send(dm::DeformableMirror, cmd::AbstractVector{<:AbstractFloat})
     num = length(dm) # FIXME: there may be several mirrors
-    length(cmd) == num || throw(DimensionMismatch("invalid number of commands"))
+    axes(cmd,1) == Base.OneTo(num) ||
+        throw(DimensionMismatch("invalid indices for commands"))
     length(dm.cmd) == num || resize!(dm.cmd, num)
     @inbounds for i in 1:num
         dm.cmd[i] = clamp(Scalar(cmd[i]), CMDMIN, CMDMAX)
