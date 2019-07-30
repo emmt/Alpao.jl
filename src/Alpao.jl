@@ -84,19 +84,23 @@ name of its configuration file.
 
 The deformable mirror instance `dm` can be used as follows:
 
-    length(dm)     # yields number of actuators
-    eltype(dm)     # yields bit type for an actuator command
-    dm[key]        # yields value of keyword `key`
-    dm[key] = val  # sets value of keyword `key`
-    dm[]           # yields the last commands sent to the mirror
-    dm[:]          # yields a copy of the last commands
-    dm[i]          # yields the value of i-th actuator in the last commands
-    send(dm, cmd)  # sets the shape of the deformable mirror
-    send!(dm, cmd) # idem but, on return, `cmd` contains actual commands
-    reset(dm)      # resets the deformable mirror values
-    stop(dm)       # stops asynchronous commands sent to the deformable mirror
-    close(dm)      # release the deformable mirror resources
-
+```julia
+length(dm)     # yields number of actuators
+eltype(dm)     # yields bit type for an actuator command
+dm[key]        # yields value of keyword `key`
+dm[key] = val  # sets value of keyword `key`
+dm[]           # yields the last commands sent to the mirror
+dm[:]          # yields a copy of the last commands
+dm[i]          # yields the value of i-th actuator in the last commands
+send(dm, cmd)  # sets the shape of the deformable mirror
+send!(dm, cmd) # idem but, on return, `cmd` contains actual commands
+reset(dm)      # resets the deformable mirror values
+stop(dm)       # stops asynchronous commands sent to the deformable mirror
+close(dm)      # release the deformable mirror resources
+minimum(dm)    # yields the minimum value of a command
+maximum(dm)    # yields the maximum value of a command
+extrema(dm)    # yields the minimum and maximum values of a command
+```
 
 List of parameter keywords
 
@@ -181,6 +185,9 @@ Base.length(dm::DeformableMirror) = dm.num
 Base.eltype(::DeformableMirror) = Scalar
 Base.unsafe_convert(::Type{Ptr{DeformableMirror}}, dm::DeformableMirror) =
     (dm.ptr != C_NULL ? dm.ptr : error("device has been closed"))
+Base.extrema(dm::DeformableMirror) = (minimum(dm), maximum(dm))
+Base.minimum(dm::DeformableMirror) = CMDMIN
+Base.maximum(dm::DeformableMirror) = CMDMAX
 
 """
 
