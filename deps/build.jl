@@ -18,7 +18,7 @@ end
 
 open(joinpath(@__DIR__, "deps.jl"), "w") do io
     write(io, "# This is an auto-generated file; do not edit.\n\n")
-    write(io, "const DLL = \"$path\"\n")
+    write(io, "const libasdk = \"$path\"\n")
 end
 
 end # module

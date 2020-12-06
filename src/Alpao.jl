@@ -7,7 +7,7 @@
 # This file is part of the `Alpao.jl` package which is licensed under the MIT
 # "Expat" License.
 #
-# Copyright (C) 2016-2019, Éric Thiébaut & Jonathan Léger.
+# Copyright (C) 2016-2020, Éric Thiébaut & Jonathan Léger.
 #
 
 module Alpao
@@ -149,13 +149,13 @@ mutable struct DeformableMirror
             odir = pwd()
             try
                 cd(dirname(ident))
-                ptr = ccall((:asdkInit, DLL), Ptr{Cvoid}, (Cstring,),
+                ptr = ccall((:asdkInit, libasdk), Ptr{Cvoid}, (Cstring,),
                             basename(ident))
             finally
                 cd(odir)
             end
         else
-            ptr = ccall((:asdkInit, DLL), Ptr{Cvoid}, (Cstring,), ident)
+            ptr = ccall((:asdkInit, libasdk), Ptr{Cvoid}, (Cstring,), ident)
         end
         if ptr == C_NULL
             code, mesg = lasterror()
@@ -177,7 +177,7 @@ end
 
 function Base.close(dm::DeformableMirror)
     if dm.ptr != C_NULL
-        status = ccall((:asdkRelease, DLL), Status,
+        status = ccall((:asdkRelease, libasdk), Status,
                        (Ptr{DeformableMirror},), dm.ptr)
         dm.ptr = C_NULL # to never release more than once
         _check(status)
@@ -212,7 +212,7 @@ function send(dm::DeformableMirror, cmd::AbstractVector{<:AbstractFloat})
     @inbounds for i in 1:num
         dm.cmd[i] = clamp(Scalar(cmd[i]), CMDMIN, CMDMAX)
     end
-    _check(ccall((:asdkSend, DLL), Status,
+    _check(ccall((:asdkSend, libasdk), Status,
                  (Ptr{DeformableMirror}, Ptr{Scalar}),
                  dm, dm.cmd))
     return dm.cmd
@@ -261,7 +261,7 @@ message.
 function lasterror()
     code = Ref{UInt32}(0)
     mesg = zeros(UInt8, 512) # message buffer filled with zeroes
-    if ccall((:asdkGetLastError, DLL), Status,
+    if ccall((:asdkGetLastError, libasdk), Status,
              (Ptr{UInt32}, Ptr{UInt8}, Csize_t),
              code, mesg, sizeof(mesg)) != SUCCESS
         error("failed to retrieve last error message")
@@ -270,7 +270,7 @@ function lasterror()
     (code[], String(mesg))
 end
 
-printlasterror() = ccall((:asdkPrintLastError, DLL), Cvoid, ())
+printlasterror() = ccall((:asdkPrintLastError, libasdk), Cvoid, ())
 
 function _check(status::Status)
     if status != SUCCESS
@@ -280,11 +280,11 @@ function _check(status::Status)
 end
 
 stop(dm::DeformableMirror) =
-    _check(ccall((:asdkStop, DLL), Status, (Ptr{DeformableMirror},), dm))
+    _check(ccall((:asdkStop, libasdk), Status, (Ptr{DeformableMirror},), dm))
 
 function reset(dm::DeformableMirror)
     fill!(dm.cmd, Scalar(0))
-    _check(ccall((:asdkReset, DLL), Status, (Ptr{DeformableMirror},), dm))
+    _check(ccall((:asdkReset, libasdk), Status, (Ptr{DeformableMirror},), dm))
 end
 
 Base.getindex(dm::DeformableMirror) = dm.cmd
@@ -293,7 +293,7 @@ Base.getindex(dm::DeformableMirror, i::Integer) = dm.cmd[i]
 Base.getindex(dm::DeformableMirror, i::AbstractUnitRange{<:Integer}) = dm.cmd[i]
 function Base.getindex(dm::DeformableMirror, key::Keyword)
     val = Ref{Scalar}(0)
-    _check(ccall((:asdkGet, DLL), Status,
+    _check(ccall((:asdkGet, libasdk), Status,
                  (Ptr{DeformableMirror}, Cstring, Ptr{Scalar}),
                  dm, key, val))
     return val[]
@@ -303,12 +303,12 @@ Base.setindex!(dm::DeformableMirror, val::Real, key::Keyword) =
     setindex!(dm, Scalar(val), key)
 
 Base.setindex!(dm::DeformableMirror, val::Scalar, key::Keyword) =
-    _check(ccall((:asdkSet, DLL), Status,
+    _check(ccall((:asdkSet, libasdk), Status,
                  (Ptr{DeformableMirror}, Cstring, Scalar),
                  dm, key, val))
 
 Base.setindex!(dm::DeformableMirror, val::AbstractString, key::Keyword) =
-    _check(ccall((:asdkSetString, DLL), Status,
+    _check(ccall((:asdkSetString, libasdk), Status,
                  (Ptr{DeformableMirror}, Cstring, Cstring),
                  dm, key, val))
 
