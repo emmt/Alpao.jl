@@ -1,6 +1,10 @@
 # Backup files:
 *~
 .#*
+*.bak
+
+# Log files:
+*.log
 
 # Binary files:
 *.gz
