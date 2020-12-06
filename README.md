@@ -19,6 +19,18 @@ Pkg.add(url="https://github.com/emmt/Alpao.jl")
 Pkg.build("Alpao")
 ```
 
+If Alpao SDK dynamic library is not automatically found or if you want to use a
+specific file, you can set he environment variable `ALPAO_SDK_DLL` to the path
+of Alpao SDK dynamic library before calling `Pkg.build("Alpao")`.  For instance:
+
+```julia
+ENV["ALPAO_SDK_DLL"] = "/opt/alpao/lib64/libasdk.so"
+Pkg.build("Alpao")
+```
+
+Setting the environment variable is only needed before (re)building the
+package.
+
 Later, it is sufficient to do:
 
 ```julia
