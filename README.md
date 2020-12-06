@@ -15,7 +15,7 @@ so you have to clone the repository to install the module:
 
 ```julia
 using Pkg
-Pkg.clone("https://github.com/emmt/Alpao.jl")
+Pkg.add(url="https://github.com/emmt/Alpao.jl")
 Pkg.build("Alpao")
 ```
 
