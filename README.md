@@ -1,6 +1,6 @@
 # Julia Interface to Alpao SDK
 
-This module provides a Julia interface to
+This module provides a [Julia](http://julialang.org/) interface to
 [ALPAO](https://www.alpao.com/adaptive-optics/) deformable mirrors.
 
 
