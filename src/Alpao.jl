@@ -7,7 +7,7 @@
 # This file is part of the `Alpao.jl` package which is licensed under the MIT
 # "Expat" License.
 #
-# Copyright (C) 2016-2020, Éric Thiébaut & Jonathan Léger.
+# Copyright (C) 2016-2021, Éric Thiébaut & Jonathan Léger.
 #
 
 module Alpao
@@ -300,17 +300,21 @@ function Base.getindex(dm::DeformableMirror, key::Keyword)
 end
 
 Base.setindex!(dm::DeformableMirror, val::Real, key::Keyword) =
-    setindex!(dm, Scalar(val), key)
+    setindex!(dm, Scalar(val)::Scalar, key)
 
-Base.setindex!(dm::DeformableMirror, val::Scalar, key::Keyword) =
+Base.setindex!(dm::DeformableMirror, val::Scalar, key::Keyword) = begin
     _check(ccall((:asdkSet, libasdk), Status,
                  (Ptr{DeformableMirror}, Cstring, Scalar),
                  dm, key, val))
+    return dm
+end
 
-Base.setindex!(dm::DeformableMirror, val::AbstractString, key::Keyword) =
+Base.setindex!(dm::DeformableMirror, val::AbstractString, key::Keyword) = begin
     _check(ccall((:asdkSetString, libasdk), Status,
                  (Ptr{DeformableMirror}, Cstring, Cstring),
                  dm, key, val))
+    return dm
+end
 
 """
 
