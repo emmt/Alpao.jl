@@ -74,13 +74,10 @@ const CMDMAX = Scalar(1.0)
 const CMDMIN = -CMDMAX
 
 """
-
-```julia
-dm = Alpao.DeformableMirror(name)
-```
+    dm = Alpao.DeformableMirror(name)
 
 creates an instance `dm` to manage Alpao's deformable mirror identifed by the
-name of its configuration file.
+`name` of its configuration file.
 
 The deformable mirror instance `dm` can be used as follows:
 
@@ -161,7 +158,7 @@ mutable struct DeformableMirror
             code, mesg = lasterror()
             error("failed to open $ident ($mesg)")
         end
-        # Create object first to be able to relase resources in case of errors.
+        # Create object first to be able to release resources in case of errors.
         dm = new(ptr, 0, Scalar[])
         try
             num = Int(dm["NbOfActuator"])
@@ -193,15 +190,15 @@ Base.minimum(dm::DeformableMirror) = CMDMIN
 Base.maximum(dm::DeformableMirror) = CMDMAX
 
 """
+    send(dm, cmd) -> actcmd
 
-```julia
-send(dm, cmd) -> actcmd
-```
+sends actuator commands `cmd` to deformable mirror `dm` and returns a vector of
+actual commands sent to the mirror.  The actual commands may be different from
+`cmd` due to bound constraints.  Actual commands are stored in an internal
+buffer specific to the deformable mirror instance and allocated at construction
+time.
 
-sends actuator commands `cmd` to deformable mirror `dm` and return vector of
-actual commands sent to the mirror.
-
-See also: [`send!`](@ref), [`lastcommand`](@ref).
+See also: [`send!`](@ref), [`Alpao.lastcommand`](@ref).
 
 """
 function send(dm::DeformableMirror, cmd::AbstractVector{<:AbstractFloat})
@@ -219,29 +216,23 @@ function send(dm::DeformableMirror, cmd::AbstractVector{<:AbstractFloat})
 end
 
 """
-
-```julia
-send!(dm, cmd) -> cmd
-```
+    send!(dm, cmd) -> cmd
 
 sends actuator commands `cmd` to deformable mirror `dm` and return, possibly
 modified, commands.  The command values in `cmd` may be modified due to bound
 constraints.  Thus, on return, `cmd` contains the actual commands sent to the
 mirror.
 
-See also: [`send`](@ref), [`lastcommand`](@ref).
+See also: [`send`](@ref), [`Alpao.lastcommand`](@ref).
 
 """
 send!(dm::DeformableMirror, cmd::AbstractVector{<:AbstractFloat}) =
     copy!(cmd, send(dm, cmd))
 
 """
+    Alpao.lastcommand(dm) -> cmd
 
-```julia
-lastcommand(dm) -> cmd
-```
-
-yields the last command actually sent to the deformable mirror `dm`.
+yields the last commands actually sent to the deformable mirror `dm`.
 
 See also: [`send(::DeformableMirror)`](@ref).
 
@@ -249,10 +240,7 @@ See also: [`send(::DeformableMirror)`](@ref).
 lastcommand(dm::DeformableMirror) = dm.cmd
 
 """
-
-```julia
-Alpao.lasterror() -> (code, mesg)
-```
+    Alpao.lasterror() -> (code, mesg)
 
 pops the last error from the stack and returns error code and corresponding
 message.
@@ -299,10 +287,7 @@ function Base.getindex(dm::DeformableMirror, key::Keyword)
     return val[]
 end
 
-Base.setindex!(dm::DeformableMirror, val::Real, key::Keyword) =
-    setindex!(dm, Scalar(val)::Scalar, key)
-
-Base.setindex!(dm::DeformableMirror, val::Scalar, key::Keyword) = begin
+Base.setindex!(dm::DeformableMirror, val::Real, key::Keyword) = begin
     _check(ccall((:asdkSet, libasdk), Status,
                  (Ptr{DeformableMirror}, Cstring, Scalar),
                  dm, key, val))
@@ -323,23 +308,21 @@ end
 """
 function runtests(name::String="BOL143")
     dm = DeformableMirror(name)
-    val = length(dm)
-    println("NB actuators ", round(Int, dm["NbOfActuator"]))
-    println("NB actuators ", val)
+    num = length(dm)
+    println("Number of actuators ", round(Int, dm["NbOfActuator"]))
+    println("Number of actuators ", num)
     image_count = 0
     tot_image_count = 0
-    data = Array(Cdouble, val)
-    data[:] = 0.0
-    time = 0.0
+    cmd = zeros(Scalar, num)
     while tot_image_count < 10000
-        for i in 1:val
-            data[i] = 0.12;
-            dm.send( data );
-            data[i] = 0.0;
-            if time() - time >= 1.0
+        for i in 1:num
+            cmd[i] = 0.12;
+            dm.send( cmd );
+            cmd[i] = 0.0;
+            if time() - t >= 1.0
                 print(image_count," FPS\r")
                 image_count = 0
-                time = time()
+                t = time()
             end
             image_count += 1
             tot_image_count += 1
