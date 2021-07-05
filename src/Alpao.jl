@@ -86,6 +86,7 @@ length(dm)     # yields number of actuators
 eltype(dm)     # yields bit type for an actuator command
 dm[key]        # yields value of keyword `key`
 dm[key] = val  # sets value of keyword `key`
+keys(dm)       # yields a list of possible keywords
 dm[]           # yields the last commands sent to the mirror
 dm[:]          # yields a copy of the last commands
 dm[i]          # yields the value of i-th actuator in the last commands
@@ -188,6 +189,10 @@ Base.unsafe_convert(::Type{Ptr{DeformableMirror}}, dm::DeformableMirror) =
 Base.extrema(dm::DeformableMirror) = (minimum(dm), maximum(dm))
 Base.minimum(dm::DeformableMirror) = CMDMIN
 Base.maximum(dm::DeformableMirror) = CMDMAX
+Base.keys(dm::DeformableMirror) = (
+    "AckTimeout", "DacReset", "ItfState", "LogDump", "LogPrintLevel",
+    "NbOfActuator", "SyncMode", "TriggerMode", "TriggerIn",
+    "UseException", "VersionInfo")
 
 """
     send(dm, cmd) -> actcmd

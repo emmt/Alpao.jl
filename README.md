@@ -10,22 +10,23 @@ To be able to use this module, you must have installed
 [ALPAO](https://www.alpao.com/adaptive-optics/) Software Development Kit (SDK)
 and have one of their deformable mirror connected to your computer.
 
-`Alpao.jl` is not yet an [official Julia package](https://pkg.julialang.org/)
-so you have to clone the repository to install the module:
+The easiest way to install `Alpao` is via Julia registry
+[`EmmtRegistry`](https://github.com/emmt/EmmtRegistry):
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/emmt/Alpao.jl")
-Pkg.build("Alpao")
+pkg"registry add https://github.com/emmt/EmmtRegistry"
+pkg"add Alpao"
 ```
 
 If Alpao SDK dynamic library is not automatically found or if you want to use a
 specific file, you can set he environment variable `ALPAO_SDK_DLL` to the path
-of Alpao SDK dynamic library before calling `Pkg.build("Alpao")`.  For instance:
+of Alpao SDK dynamic library before calling `Pkg.build("Alpao")`.  For example:
 
 ```julia
 ENV["ALPAO_SDK_DLL"] = "/opt/alpao/lib64/libasdk.so"
-Pkg.build("Alpao")
+using Pkg
+pkg"build Alpao"
 ```
 
 Setting the environment variable is only needed before (re)building the
