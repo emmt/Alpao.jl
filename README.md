@@ -143,6 +143,12 @@ read or write only):
 |                 |     |     |       | is SDK v3.04.05.0612 where 0612 is      |
 |                 |     |     |       | build number.                           |
 
+To retrieve the version of the SDK as an instance of `VersionNumber`, just call:
+
+```julia
+VersionNumber(dm)
+```
+
 The last error in the SDK can be retrieved with:
 
 ```julia

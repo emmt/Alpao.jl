@@ -82,22 +82,23 @@ creates an instance `dm` to manage Alpao's deformable mirror identifed by the
 The deformable mirror instance `dm` can be used as follows:
 
 ```julia
-length(dm)     # yields number of actuators
-eltype(dm)     # yields bit type for an actuator command
-dm[key]        # yields value of keyword `key`
-dm[key] = val  # sets value of keyword `key`
-keys(dm)       # yields a list of possible keywords
-dm[]           # yields the last commands sent to the mirror
-dm[:]          # yields a copy of the last commands
-dm[i]          # yields the value of i-th actuator in the last commands
-send(dm, cmd)  # sets the shape of the deformable mirror
-send!(dm, cmd) # idem but, on return, `cmd` contains actual commands
-reset(dm)      # resets the deformable mirror values
-stop(dm)       # stops asynchronous commands sent to the deformable mirror
-close(dm)      # release the deformable mirror resources
-minimum(dm)    # yields the minimum value of a command
-maximum(dm)    # yields the maximum value of a command
-extrema(dm)    # yields the minimum and maximum values of a command
+length(dm)        # yields number of actuators
+eltype(dm)        # yields bit type for an actuator command
+dm[key]           # yields value of keyword `key`
+dm[key] = val     # sets value of keyword `key`
+keys(dm)          # yields a list of possible keywords
+dm[]              # yields the last commands sent to the mirror
+dm[:]             # yields a copy of the last commands
+dm[i]             # yields the value of i-th actuator in the last commands
+send(dm, cmd)     # sets the shape of the deformable mirror
+send!(dm, cmd)    # idem but, on return, `cmd` contains actual commands
+reset(dm)         # resets the deformable mirror values
+stop(dm)          # stops asynchronous commands sent to the deformable mirror
+close(dm)         # release the deformable mirror resources
+minimum(dm)       # yields the minimum value of a command
+maximum(dm)       # yields the maximum value of a command
+extrema(dm)       # yields the minimum and maximum values of a command
+VersionNumber(dm) # yields the SDK version number
 ```
 
 List of parameter keywords
@@ -193,6 +194,14 @@ Base.keys(dm::DeformableMirror) = (
     "AckTimeout", "DacReset", "ItfState", "LogDump", "LogPrintLevel",
     "NbOfActuator", "SyncMode", "TriggerMode", "TriggerIn",
     "UseException", "VersionInfo")
+
+function Base.VersionNumber(dm::DeformableMirror)
+    value = Int(dm["VersionInfo"])
+    value, build = divrem(value, 10_000)
+    value, patch = divrem(value, 100)
+    major, minor = divrem(value, 100)
+    return VersionNumber("$major.$minor.$patch-$build")
+end
 
 """
     send(dm, cmd) -> actcmd
