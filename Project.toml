@@ -1,7 +1,7 @@
 name = "Alpao"
 uuid = "4995ad59-ea22-4881-abe2-ae7e9062fb98"
 authors = ["Éric Thiébaut <https://github.com/emmt>"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
